@@ -1,0 +1,133 @@
+IoT bonus — quick reference (plain text, not markdown)
+======================================================
+
+Prereq (once)
+-------------
+  bash bonus/scripts/install.sh
+  bash bonus/scripts/setup.sh
+
+Helm / GitLab (manual equivalents)
+----------------------------------
+  helm repo add gitlab https://charts.gitlab.io/
+  helm repo update gitlab
+  kubectl create namespace gitlab
+  helm upgrade --install gitlab gitlab/gitlab -n gitlab -f bonus/confs/values.yaml --version 8.8.1 --timeout 60m --wait
+
+Find initial root password
+--------------------------
+  kubectl get secrets -n gitlab | grep gitlab-initial-root-password
+  kubectl -n gitlab get secret <secret-name> -o jsonpath="{.data.password}" | base64 -d ; echo
+
+Port-forward GitLab HTTP (host pushes / UI)
+-------------------------------------------
+  kubectl port-forward -n gitlab svc/gitlab-webservice-default 9080:8181
+
+Create Git repo + push manifests (if you skip the scripted bootstrap)
+-----------------------------------------------------------------------
+  # Project must exist in GitLab as root/iot-gitops (create in UI if rails bootstrap failed).
+  ROOT_PASS="$(kubectl -n gitlab get secret <secret-name> -o jsonpath='{.data.password}' | base64 -d)"
+  PASS_ENC="$(printf '%s' "$ROOT_PASS" | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))")"
+  git init -b main
+  mkdir -p manifests && cp bonus/confs/manifests/deployment.yaml manifests/
+  git add manifests && git commit -m "init"
+  git remote add origin "http://root:${PASS_ENC}@127.0.0.1:9080/root/iot-gitops.git"
+  git push -u origin main
+
+In-cluster Git URL used by Argo CD
+----------------------------------
+  http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-gitops.git
+
+Argo CD (CLI)
+-------------
+  kubectl port-forward svc/argocd-server -n argocd 8080:443
+  ARGO_PASS="$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+  argocd login localhost:8080 --username admin --password "$ARGO_PASS" --insecure
+  argocd repo add "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-gitops.git" \
+    --username root --password "$ROOT_PASS" --insecure-skip-server-verification
+  argocd app create wil-playground \
+    --repo "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-gitops.git" \
+    --path manifests --revision main \
+    --dest-server https://kubernetes.default.svc --dest-namespace dev \
+    --sync-policy automated --auto-prune --self-heal
+
+Port-forward playground app
+---------------------------
+  kubectl port-forward -n dev svc/wil-playground 8888:8888
+
+Smoke tests
+-----------
+  curl -sS http://localhost:8888/ | head
+  argocd app get wil-playground
+  argocd app sync wil-playground   # only if you disabled automation; bonus uses automated sync
+
+Evaluator: v1 -> v2 (image bump)
+--------------------------------
+  1) In GitLab: edit manifests/deployment.yaml (image: wil42/playground:v2), commit to main.
+     Or from a clone: git commit -am bump && git push
+  2) Watch Argo CD refresh/sync (default repo polling ~3 minutes unless you lower timeout).
+  3) kubectl -n dev get pods -o wide
+  4) curl http://localhost:8888/ (confirm new revision is live after rollout).
+
+How to test the bonus manually (step by step)
+--------------------------------------------
+  1) Open GitLab UI: http://localhost:9080
+  2) Log in as root with: cat ~/gitlabrootpass
+  3) Open project: root / iot-gitops
+  4) Open file: manifests/deployment.yaml
+  5) Change this line:
+       image: wil42/playground:v1
+     to:
+       image: wil42/playground:v2
+  6) Commit directly to branch main.
+  7) Wait for Argo CD to detect the change and sync automatically.
+  8) Check status:
+       argocd app get wil-playground
+  9) Check rollout:
+       kubectl -n dev get pods -w
+ 10) Test the app:
+       curl localhost:8888
+     Expected response after sync:
+       {"status":"ok", "message": "v2"}
+
+If you want to do it with git commands instead of the UI, use:
+  ROOT_PASS="$(cat ~/gitlabrootpass)"
+  PASS_ENC="$(printf '%s' "$ROOT_PASS" | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))")"
+  git clone "http://root:${PASS_ENC}@127.0.0.1:9080/root/iot-gitops.git"
+  cd iot-gitops
+  sed -i 's|image: wil42/playground:v1|image: wil42/playground:v2|' manifests/deployment.yaml
+  git add manifests/deployment.yaml
+  git commit -m "bump playground image to v2"
+  git push origin main
+
+
+------------
+cat ~/gitlabrootpass : for password
+
+live setup:
+kubectl get pods -A
+
+watch live:
+watch kubectl get pods -A
+
+watch pods specefic :
+watch kubectl get pods -n gitlab
+
+--- Test App
+
+Run: curl localhost:8888 Should return app response. If yes so Kubernetes deployment works
+
+--- Test GitLab UI Open browser: http://localhost:9080 
+Login:
+username: root
+password: cat ~/gitlabrootpass
+
+--- VERY IMPORTANT TEST 
+Inside GitLab: Verify repository exists: iot-gitops
+
+--- Verify deployment.yaml Exists, Inside GitLab repo check: manifests/deployment.yaml
+
+--- Test Argo CD UI Open: https://localhost:8080
+Login:admin
+Password:cat ~/argocdpass
+
+--- MOST IMPORTANT VISUAL TEST

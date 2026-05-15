@@ -1,0 +1,103 @@
+# GitLab Helm chart — lightweight profile for k3d / small VMs.
+# Based on GitLab chart example "values-minikube-minimum.yaml" (ingress off, no cert-manager, no Prometheus, no runner).
+# Pin chart version in setup.sh (helm install --version) for reproducible defenses.
+#
+# Expect roughly 3 vCPU / 6–8 GiB RAM free on the VM; GitLab remains heavy even when minimized.
+
+global:
+  edition: ce
+  kas:
+    enabled: false
+  registry:
+    enabled: false
+  ingress:
+    configureCertmanager: false
+    enabled: false
+  hosts:
+    # Used in generated clone URLs and internal routing; in-cluster clients use the Kubernetes Service DNS name.
+    domain: k3d.local
+    https: false
+    gitlab:
+      name: gitlab
+  rails:
+    bootsnap:
+      enabled: false
+
+certmanager:
+  install: false
+
+nginx-ingress:
+  enabled: false
+
+prometheus:
+  install: false
+
+gitlab-runner:
+  install: false
+
+# Container registry not needed for this bonus (Argo CD pulls public wil42/playground from Docker Hub).
+registry:
+  enabled: false
+
+# Smaller PVCs where the chart exposes sizing (tune upward if installs fail on storage).
+gitlab:
+  webservice:
+    minReplicas: 1
+    maxReplicas: 1
+    workerProcesses: 2
+  sidekiq:
+    minReplicas: 1
+    maxReplicas: 1
+  gitlab-shell:
+    minReplicas: 1
+    maxReplicas: 1
+  gitaly:
+    persistence:
+      size: 2Gi
+  toolbox:
+    persistence:
+      enabled: false
+
+minio:
+  persistence:
+    size: 2Gi
+
+postgresql:
+  image:
+    repository: bitnamilegacy/postgresql
+  volumePermissions:
+    enabled: false
+    image:
+      repository: bitnamilegacy/os-shell
+  metrics:
+    image:
+      repository: bitnamilegacy/postgres-exporter
+  primary:
+    persistence:
+      size: 2Gi
+
+redis:
+  image:
+    repository: bitnamilegacy/redis
+  metrics:
+    image:
+      repository: bitnamilegacy/redis-exporter
+  sentinel:
+    enabled: false
+    image:
+      repository: bitnamilegacy/redis-sentinel
+  kubectl:
+    enabled: false
+    image:
+      repository: bitnamilegacy/kubectl
+  sysctl:
+    enabled: false
+    image:
+      repository: bitnamilegacy/os-shell
+  volumePermissions:
+    enabled: false
+    image:
+      repository: bitnamilegacy/os-shell
+  master:
+    persistence:
+      size: 256Mi
