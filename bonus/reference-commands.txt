@@ -90,16 +90,29 @@ How to test the bonus manually (step by step)
        {"status":"ok", "message": "v2"}
 
 If you want to do it with git commands instead of the UI, use:
-  ROOT_PASS="$(cat ~/gitlabrootpass)"
-  PASS_ENC="$(printf '%s' "$ROOT_PASS" | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))")"
+  ROOT_PASS="$(cat ~/gitlabrootpass)" &&
+  PASS_ENC="$(printf '%s' "$ROOT_PASS" | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))")" &&
   git clone "http://root:${PASS_ENC}@127.0.0.1:9080/root/iot-gitops.git"
   cd iot-gitops
+  git config user.name "iot-bonus"
+  git config user.email "iot-bonus@local"
   sed -i 's|image: wil42/playground:v1|image: wil42/playground:v2|' manifests/deployment.yaml
   git add manifests/deployment.yaml
   git commit -m "bump playground image to v2"
   git push origin main
 
-
+++++++++++++++
+ROOT_PASS="$(cat ~/gitlabrootpass)"
+PASS_ENC="$(printf '%s' "$ROOT_PASS" | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))")"
+git clone "http://root:${PASS_ENC}@127.0.0.1:9080/root/iot-gitops.git"
+cd iot-gitops
+git config user.name "iot-bonus"
+git config user.email "iot-bonus@local"
+sed -i 's|image: wil42/playground:v1|image: wil42/playground:v2|' manifests/deployment.yaml
+git add manifests/deployment.yaml
+git commit -m "bump playground image to v2"
+git push origin main
++++++++++++++
 ------------
 cat ~/gitlabrootpass : for password
 
