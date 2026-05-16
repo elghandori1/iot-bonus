@@ -193,7 +193,7 @@ sudo -u "${REAL_USER}" git -C "${TMP_GIT}" commit -m "bootstrap: wil-playground 
 log "Starting temporary GitLab port-forward :${GITLAB_HTTP_PF_PORT} -> ${GITLAB_SVC}:${GITLAB_HTTP_PORT}..."
 pkill -f "port-forward.*${GITLAB_SVC}.*${GITLAB_HTTP_PF_PORT}" 2>/dev/null || true
 sleep 1
-sudo -u "${REAL_USER}" kubectl port-forward -n "${GITLAB_NS}" "svc/${GITLAB_SVC}" "${GITLAB_HTTP_PF_PORT}:${GITLAB_HTTP_PORT}" >/tmp/gitlab-http-pf.log 2>&1 &
+nohup sudo -u "${REAL_USER}" kubectl port-forward -n "${GITLAB_NS}" "svc/${GITLAB_SVC}" "${GITLAB_HTTP_PF_PORT}:${GITLAB_HTTP_PORT}" >/tmp/gitlab-http-pf.log 2>&1 </dev/null &
 sleep 3
 
 PASS_ENC="$(sudo -u "${REAL_USER}" python3 -c "import urllib.parse, pathlib; print(urllib.parse.quote(pathlib.Path('${GITLAB_ROOT_PASSWORD_FILE}').read_text().strip(), safe=''))")"
@@ -220,7 +220,7 @@ ARGOCD_PASS="$(cat "${ARGOCD_PASSWORD_FILE}")"
 log "Starting Argo CD port-forward on localhost:${ARGOCD_PF_PORT} (HTTPS -> local)..."
 pkill -f "port-forward svc/argocd-server.*${ARGOCD_PF_PORT}" 2>/dev/null || true
 sleep 1
-sudo -u "${REAL_USER}" kubectl port-forward svc/argocd-server -n argocd "${ARGOCD_PF_PORT}:443" >/tmp/argocd-pf.log 2>&1 &
+nohup sudo -u "${REAL_USER}" kubectl port-forward svc/argocd-server -n argocd "${ARGOCD_PF_PORT}:443" >/tmp/argocd-pf.log 2>&1 </dev/null &
 sleep 6
 
 log "Logging into Argo CD CLI..."
@@ -259,7 +259,7 @@ kubectl wait --for=condition=available --timeout=300s deployment/wil-playground 
 log "Starting wil-playground port-forward on localhost:${APP_PF_PORT}..."
 pkill -f "port-forward svc/wil-playground.*${APP_PF_PORT}" 2>/dev/null || true
 sleep 1
-sudo -u "${REAL_USER}" kubectl port-forward svc/wil-playground -n dev "${APP_PF_PORT}:8888" >/tmp/wil-playground-pf.log 2>&1 &
+nohup sudo -u "${REAL_USER}" kubectl port-forward svc/wil-playground -n dev "${APP_PF_PORT}:8888" >/tmp/wil-playground-pf.log 2>&1 </dev/null &
 sleep 3
 
 log "Smoke test: curl the playground app..."
@@ -274,3 +274,4 @@ log "App URL    : http://localhost:${APP_PF_PORT}/"
 log "Git remote (in-cluster, for Argo CD): ${GIT_REPO_HTTP_INTERNAL}"
 log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 log "Evaluator: bump image wil42/playground:v1 -> v2 by editing manifests/deployment.yaml in GitLab, commit to main; Argo CD auto-sync will roll the Deployment."
+log "NOTE:If localhost:8888 stops responding later, restart the tunnel with:kubectl port-forward -n dev svc/wil-playground 8888:8888"
