@@ -61,8 +61,8 @@ Port-forward playground app
             Use the command above ONLY for recovery if the port-forward crashes later.
             Check status: ps aux | grep "port-forward.*wil-playground"
 
-Smoke tests
------------
+=========================================== Smoke tests
+
   curl -sS http://localhost:8888/ | head
   argocd app get wil-playground
   argocd app sync wil-playground   # only if you disabled automation; bonus uses automated sync
@@ -87,8 +87,8 @@ Evaluator: v1 -> v2 (image bump)
        After initial setup, NEVER edit bonus/confs/manifests/deployment.yaml directly.
        Always edit via GitLab UI or git clone/push from GitLab.
 
-How to test the bonus manually (step by step)
---------------------------------------------
+=== > How to test the bonus manually (step by step)
+---------------------------------------------------
   1) Open GitLab UI: http://localhost:9080
   2) Log in as root with: cat ~/gitlabrootpass
   3) Open project: root / iot-gitops
@@ -112,74 +112,255 @@ If you want to do it with git commands instead of the UI, use:
   ROOT_PASS="$(cat ~/gitlabrootpass)" &&
   PASS_ENC="$(printf '%s' "$ROOT_PASS" | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))")" &&
   git clone "http://root:${PASS_ENC}@127.0.0.1:9080/root/iot-gitops.git"
-  // cd iot-gitops
+  Enter repository: cd iot-gitops
+  Configure git:
   git config user.name "iot-bonus"
   git config user.email "iot-bonus@local"
-  sed -i 's|image: wil42/playground:v1|image: wil42/playground:v2|' manifests/deployment.yaml
+  Modify deployment: sed -i 's|image: wil42/playground:v1|image: wil42/playground:v2|' manifests/deployment.yaml
+  Commit and push:
   git add manifests/deployment.yaml
   git commit -m "bump playground image to v2"
   git push origin main
-  Then restart it: kubectl port-forward -n dev svc/wil-playground 8888:8888
 
+-----------------------RESULT AFTER PUSH-------------------------
++ Argo CD detects the new commit automatically.
++ Kubernetes updates deployment automatically.
++ Watch rollout: bash kubectl -n dev get pods -w
 
-++++ same cleary:
+-----------------------FINAL TEST-------------------------
++ verify is port still forwarded : ps aux | grep "port-forward.*wil-playground"
++ Restart temporary access tunnel if needed: bash kubectl port-forward -n dev svc/wil-playground 8888:8888
++ Test application: bash curl localhost:8888
 
--- verify is port still forwarded : ps aux | grep "port-forward.*wil-playground"
--- Then restart it: kubectl port-forward -n dev svc/wil-playground 8888:8888
--- or better: nohup kubectl port-forward -n dev svc/wil-playground 8888:8888 >/tmp/wil-playground.log 2>&1 &
--- Then curl localhost:8888 : should work directly.
+Expected result after synchronization: {"status":"ok","message":"v2"}
+Or test from browser: http://localhost:8888
 
-++++ GitOps flow :
+------------------------IMPORTANT NOTE ABOUT PORT-FORWARD
 
-Edit GitLab repo
-Push to main
-Argo CD detects change
-Kubernetes rollout starts
-Service updates automatically
+kubectl port-forward is NOT permanent.
 
-we can watch it live with: kubectl -n dev get pods -w
+It is only a temporary local tunnel between:
 
-and check Argo CD sync status: argocd app get wil-playground
+your machine
+and Kubernetes service
 
+If localhost:8888 stops working later,
+restart the tunnel manually:
 
+bash
+kubectl port-forward -n dev svc/wil-playground 8888:8888
 
+This is normal behavior and not a problem in the project.
 
+========================== Test Apps
 
+Create temporary local access to Kubernetes service:
+bash
+kubectl port-forward -n dev svc/wil-playground 8888:8888
 
+Meaning:
+Temporary tunnel:
 
+localhost:8888
+↓
+Kubernetes Service
+↓
+wil-playground Pod
 
+Then test Run: curl localhost:8888 Or open browser: http://localhost:8888
 
-------------
-cat ~/gitlabrootpass : for password
+ + Should return app response. If yes so Kubernetes deployment works
 
-live setup:
-kubectl get pods -A
-
-watch live:
-watch kubectl get pods -A
-
-watch pods specefic :
-watch kubectl get pods -n gitlab
-
---- Test App
-
-Run: curl localhost:8888 Should return app response. If yes so Kubernetes deployment works
-
---- Test GitLab UI Open browser: http://localhost:9080 
+--------------- Test GitLab UI Open browser: http://localhost:9080 
 Login:
 username: root
 password: cat ~/gitlabrootpass
 
---- VERY IMPORTANT TEST 
-Inside GitLab: Verify repository exists: iot-gitops
+ + VERY IMPORTANT TEST 
+   Inside GitLab: Verify repository exists: iot-gitops 
+   And Verify deployment.yaml Exists, Inside GitLab repo check: manifests/deployment.yaml
 
---- Verify deployment.yaml Exists, Inside GitLab repo check: manifests/deployment.yaml
-
---- Test Argo CD UI Open: https://localhost:8080
+---------------  Test Argo CD UI Open: https://localhost:8080
 Login:admin
 Password:cat ~/argocdpass
 
---- MOST IMPORTANT VISUAL TEST
+ + Should see : wil-playground
+
+========================= SUMMARY =========================
+
+install.sh : This script installs tools.
+
+| Tool       | Why                    |
+| ---------- | ---------------------- |
+| Docker     | Required by K3d        |
+| kubectl    | Kubernetes CLI         |
+| K3d        | Lightweight Kubernetes |
+| argocd CLI | Manage Argo CD         |
+| Helm       | Install GitLab using Helm charts|
+
+--------------- K3s / K3d Concept
+
++ K3s = lightweight Kubernetes
++ K3d = K3s running INSIDE Docker containers
+
+++ Meaning: Docker containers simulate Kubernetes nodes.
+++ So: K3d uses Docker underneath.
+
+------------- setup.sh : Infrastructure Automation Script
+
++ This script automatically creates the whole infrastructure.
+
+-------------- 1. Cluster Creation
+
++ Creates Kubernetes cluster:
+
+bash
+k3d cluster create mycluster
+
+------------- 2. Namespace Creation
+
++ Creates isolated Kubernetes environments:
+
+bash
+kubectl create namespace argocd
+kubectl create namespace dev
+kubectl create namespace gitlab
+
++ Purpose: Namespaces separate systems logically.
+
++ Example:
+  - argocd namespace → Argo CD system
+  - gitlab namespace → GitLab services
+  - dev namespace → deployed application
+
+------------- 3. Argo CD Installation
+
++ Installs all Argo CD components automatically:
+  - API Server
+  - Controller
+  - Repo Server
+  - UI
+
++ After installation:
+
+  - Retrieve admin password
+  - Login using argocd CLI
+  - Create Argo CD Application 
+
++ Command example: 
+
+  bash
+  argocd app create wil-playground
+
+++ Meaning: Tell Argo CD: "Watch this GitLab repository continuously."
+
+++GitOps flow:
+
+  Git change
+      ↓
+  Argo CD detects change
+      ↓
+  Kubernetes cluster updates automatically
+
+------------- 4. GitLab Installation
+
++ GitLab is installed inside Kubernetes using Helm.
+
+------------- 5. GitLab Access
+
++ Access GitLab locally using port-forward:
+
+  bash
+  kubectl port-forward svc/gitlab-webservice-default -n gitlab 9080:8181
+
++ Meaning: Creates temporary access from your machine → Kubernetes service.
+
++ Then open: http://localhost:9080
+
+------------- 6. GitLab Repository Creation
+
++ Creates GitLab project: root/iot-gitops
+++ This repository becomes the GitOps source of truth.
+
+------------- 7. Push Kubernetes manifests to GitLab
+
++ The setup script copies:bonus/confs/manifests/deployment.yaml
+
++ Into the GitLab repository.
++ Important: bonus/confs/manifests is ONLY the bootstrap source.
++ After setup: Argo CD watches ONLY the GitLab repository.
+
++ Flow:
+
+Local bootstrap manifests
+↓ copied once
+GitLab repository (source of truth)
+↓ watched by Argo CD
+Kubernetes cluster
+
++ Meaning: After initialization, changes must be done in GitLab,NOT inside local bonus/confs/manifests.
+
+------------- 8. Configure Argo CD Repository Access
+ 
++ Argo CD is configured to connect to GitLab repository.
+
++ Repository used: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-gitops.git
+
+------------- 9. Deployment Manifest :
+
++ Current deployment file: manifests/deployment.yaml
+
++ Contains:
+  - Kubernetes Deployment
+  - Kubernetes Service
+  - Docker image:wil42/playground
+
+------------- 10. Automatic GitOps Synchronization
+
++ Argo CD continuously watches GitLab. If deployment.yaml changes:
+
+Example:
+
+image: wil42/playground-v1
+↓
+image: wil42/playground-v2
+
+Then automatically:
+
+GitLab update
+↓
+Argo CD detects change
+↓
+Kubernetes rollout starts
+↓
+New container version deployed
+
+No manual kubectl apply required.
+
+=================== LIVE MONITORING COMMANDS
+
+See all pods:
+bash
+kubectl get pods -A
+
+Watch pods live:
+bash
+watch kubectl get pods -A
+
+Watch GitLab pods only:
+bash
+watch kubectl get pods -n gitlab
+
+Watch application rollout:
+bash
+kubectl -n dev get pods -w
 
 
------------ summary commands:
+--- argocd command
+check Argo CD sync status:
+bash
+argocd app get wil-playground
+
+getting Argo
+bash
+argocd app get wil-playground
