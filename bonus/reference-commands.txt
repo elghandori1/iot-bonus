@@ -40,15 +40,22 @@ In-cluster Git URL used by Argo CD
 Argo CD (CLI)
 -------------
   kubectl port-forward svc/argocd-server -n argocd 8080:443
-  ARGO_PASS="$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
-  argocd login localhost:8080 --username admin --password "$ARGO_PASS" --insecure
-  argocd repo add "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-gitops.git" \
+  ROOT_PASS="$(cat ~/gitlabrootpass)"
+  ARGO_PASS="$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)" &&
+  argocd login localhost:8080 --username admin --password "$ARGO_PASS" --insecure &&
+  argocd repo add "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-gitops.git" 
     --username root --password "$ROOT_PASS" --insecure-skip-server-verification
+  
+  ++++ link ArgoCD with repository:
   argocd app create wil-playground \
     --repo "http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-gitops.git" \
     --path manifests --revision main \
     --dest-server https://kubernetes.default.svc --dest-namespace dev \
     --sync-policy automated --auto-prune --self-heal
+  Force synchronization
+      argocd app sync wil-playground
+  Check application status
+      argocd app get wil-playground
 
 Port-forward playground app
 ---------------------------
@@ -57,7 +64,6 @@ Port-forward playground app
  AUTOMATIC: After setup.sh completes, this port-forward is already running in the background (nohup).
             You do NOT need to run this command manually.
             curl localhost:8888 should work immediately after setup finishes.
-            
             Use the command above ONLY for recovery if the port-forward crashes later.
             Check status: ps aux | grep "port-forward.*wil-playground"
 
@@ -65,7 +71,7 @@ Port-forward playground app
 
   curl -sS http://localhost:8888/ | head
   argocd app get wil-playground
-  argocd app sync wil-playground   # only if you disabled automation; bonus uses automated sync
+  argocd app sync wil-playground  # only if you disabled automation; bonus uses automated sync
 
 Evaluator: v1 -> v2 (image bump)
 --------------------------------
@@ -113,11 +119,11 @@ If you want to do it with git commands instead of the UI, use:
   PASS_ENC="$(printf '%s' "$ROOT_PASS" | python3 -c "import sys,urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))")" &&
   git clone "http://root:${PASS_ENC}@127.0.0.1:9080/root/iot-gitops.git"
   Enter repository: cd iot-gitops
-  Configure git:
+  +Configure git:
   git config user.name "iot-bonus"
   git config user.email "iot-bonus@local"
   Modify deployment: sed -i 's|image: wil42/playground:v1|image: wil42/playground:v2|' manifests/deployment.yaml
-  Commit and push:
+  +Commit and push:
   git add manifests/deployment.yaml
   git commit -m "bump playground image to v2"
   git push origin main
@@ -129,7 +135,7 @@ If you want to do it with git commands instead of the UI, use:
 
 -----------------------FINAL TEST-------------------------
 + verify is port still forwarded : ps aux | grep "port-forward.*wil-playground"
-+ Restart temporary access tunnel if needed: bash kubectl port-forward -n dev svc/wil-playground 8888:8888
++ Restart temporary access tunnel if needed: bash nohup kubectl port-forward -n dev svc/wil-playground 8888:8888
 + Test application: bash curl localhost:8888
 
 Expected result after synchronization: {"status":"ok","message":"v2"}
@@ -339,6 +345,16 @@ No manual kubectl apply required.
 
 =================== LIVE MONITORING COMMANDS
 
+--- in case stoping
+
+clusters checks :
+bash
+k3d cluster list
+
+Start cluster again
+bash
+k3d cluster start mycluster
+
 See all pods:
 bash
 kubectl get pods -A
@@ -355,7 +371,6 @@ Watch application rollout:
 bash
 kubectl -n dev get pods -w
 
-
 --- argocd command
 check Argo CD sync status:
 bash
@@ -364,3 +379,17 @@ argocd app get wil-playground
 getting Argo
 bash
 argocd app get wil-playground
+
+-- Access GitLab again on localhost:9080
+kubectl port-forward -n gitlab svc/gitlab-webservice-default 9080:8181
+
+-- Restart Argo CD UI
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+-- App reset:
+kubectl port-forward -n dev svc/wil-playground 8888:8888
+and do curl localhost:8888 or use the browser
+
+-- if want delete Cluster was deleted completely
+use command : k3d cluster delete mycluster
+and then use command : bash bonus/scripts/setup.sh
