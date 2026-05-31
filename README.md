@@ -1,21 +1,6 @@
 # IoT Bonus: GitOps Infrastructure with Kubernetes, ArgoCD & GitLab
 
-A comprehensive GitOps automation project demonstrating Kubernetes (k3s) cluster management with ArgoCD and in-cluster GitLab as the source of truth.
-
-**Table of Contents:**
-- [Project Overview](#project-overview)
-- [Architecture](#architecture)
-- [Technology Stack](#technology-stack)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Directory Structure](#directory-structure)
-- [Setup Details](#setup-details)
-- [Testing the Deployment](#testing-the-deployment)
-- [GitOps Workflow](#gitops-workflow)
-- [Troubleshooting](#troubleshooting)
-- [Manual Commands Reference](#manual-commands-reference)
-
----
+Inception of Things (IoT) is a DevOps-focused project that explores modern cloud-native infrastructure using Kubernetes and GitOps principles. The project demonstrates how applications and services can be automatically deployed, synchronized, and managed through declarative configuration stored in Git repositories.
 
 ## Project Overview
 
@@ -25,6 +10,27 @@ This project demonstrates a complete **GitOps workflow** using modern cloud-nati
 - **GitLab**: In-cluster Git repository serving as the source of truth
 - **ArgoCD**: Continuous deployment tool that watches GitLab and automatically syncs Kubernetes manifests
 - **Automated Infrastructure**: One-command setup that provisions everything automatically
+
+
+## Learning Objectives
+
+Through this project, you will gain practical experience with:
+
+- Kubernetes fundamentals and cluster management
+
+- Container orchestration and service discovery
+
+- GitOps workflows and infrastructure as code
+
+- Continuous deployment with ArgoCD
+
+- GitLab integration for deployment automation
+
+- Application lifecycle management
+
+- Declarative infrastructure configuration
+
+- Monitoring and synchronization of Kubernetes resources
 
 ### Key Features
 
@@ -908,18 +914,3 @@ This project demonstrates a complete **GitOps infrastructure setup** with:
 6. **Easy Testing**: Built-in smoke tests and validation procedures
 
 The setup is production-grade for development/testing but can be extended for larger deployments by modifying k3d cluster arguments, GitLab Helm values, and adding proper ingress/TLS configuration.
-
----
-
-## License
-
-[Add your license information here]
-
-## Author
-
-IoT Bonus Project - Modern DevOps & GitOps Infrastructure
-
----
-
-**Last Updated**: 2026-05-22  
-**Status**: Production-Ready for Development & Testing
